@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -9,6 +10,7 @@ from src.config import settings
 from src.api.routes import alerts, investigations, skills, agents, dashboard
 from src.api.ws import router as ws_router
 from src.state.checkpoint import ensure_indices
+from src.agents.orchestrator import run_poll_loop, run_hunt_loop
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,25 @@ async def lifespan(app: FastAPI):
     app.state.es = AsyncElasticsearch(settings.elasticsearch_url)
     await ensure_indices(app.state.es)
     logger.info("Breach Watcher backend started — ES at %s", settings.elasticsearch_url)
+
+    # Start orchestrator background tasks
+    poll_task = asyncio.create_task(run_poll_loop())
+    hunt_task = asyncio.create_task(run_hunt_loop())
+    logger.info("Orchestrator poll and hunt loops started")
+
     yield
+
+    # Cancel background tasks on shutdown
+    poll_task.cancel()
+    hunt_task.cancel()
+    try:
+        await poll_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await hunt_task
+    except asyncio.CancelledError:
+        pass
     await app.state.es.close()
 
 

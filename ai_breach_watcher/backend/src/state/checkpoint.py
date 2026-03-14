@@ -12,7 +12,7 @@ CHECKPOINT_DOC_ID = "watcher-checkpoint"
 async def ensure_indices(es: AsyncElasticsearch) -> None:
     """Create Breach Watcher indices if they don't exist."""
     single_node_settings = {"settings": {"number_of_replicas": 0}}
-    for index in [settings.alerts_index, settings.investigations_index, settings.state_index]:
+    for index in [settings.alerts_index, settings.investigations_index, settings.state_index, "breach-watcher-agent-logs"]:
         try:
             exists = await es.indices.exists(index=index)
             if not exists:

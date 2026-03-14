@@ -3,7 +3,7 @@
 
 echo "=== [1/5] Installing dependencies ==="
 apt-get update -y
-apt-get install -y git python3 python3-pip python3-venv golang-go unzip jq curl
+apt-get install -y git python3 python3-pip python3-venv golang-go unzip jq curl zlib1g
 
 echo "=== [2/5] Cloning CALDERA ==="
 cd /home/ubuntu
@@ -21,6 +21,7 @@ python3 -m venv .calderavenv
 source .calderavenv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
+pip install pyminizip
 
 echo "=== [4/5] Writing config ==="
 cat > conf/local.yml << 'EOF'
