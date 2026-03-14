@@ -7,8 +7,14 @@ apt-get install -y git python3 python3-pip python3-venv golang-go unzip jq curl
 
 echo "=== [2/5] Cloning CALDERA ==="
 cd /home/ubuntu
-git clone https://github.com/mitre/caldera.git --recursive --tag 5.1.0
+git clone --branch 5.1.0 --single-branch https://github.com/mitre/caldera.git caldera
 cd caldera
+
+git submodule update --init plugins/sandcat
+git submodule update --init plugins/stockpile
+git submodule update --init plugins/emu
+git submodule update --init plugins/response
+git submodule update --init plugins/manx
 
 echo "=== [3/5] Python venv + deps ==="
 python3 -m venv .calderavenv
