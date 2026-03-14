@@ -96,8 +96,8 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
-      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000/ws}
+      - VITE_API_URL=${VITE_API_URL:-http://backend:8000}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://backend:8000/ws}
     volumes:
       - ./frontend/src:/app/src
     depends_on:
