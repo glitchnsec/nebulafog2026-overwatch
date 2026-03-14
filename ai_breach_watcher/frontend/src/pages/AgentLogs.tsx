@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getAgentRuns } from "../api";
 import { useFetch } from "../hooks";
 
@@ -6,6 +7,7 @@ const AGENTS = ["", "Triage", "TTP Analysis Team", "Hunter", "Responder"];
 
 export default function AgentLogs() {
   const [agent, setAgent] = useState("");
+  const navigate = useNavigate();
   const { data, loading, error } = useFetch(
     () => getAgentRuns(agent || undefined),
     [agent]
@@ -43,7 +45,11 @@ export default function AgentLogs() {
         </thead>
         <tbody>
           {(data ?? []).map((run) => (
-            <tr key={run.id}>
+            <tr
+              key={run.id}
+              className="clickable-row"
+              onClick={() => navigate(`/agents/${run.id}`)}
+            >
               <td>{run.agent_name}</td>
               <td>
                 <span className={`badge ${run.status === "completed" ? "low" : run.status === "running" ? "medium" : "high"}`}>
@@ -51,7 +57,7 @@ export default function AgentLogs() {
                 </span>
               </td>
               <td>{run.event_count ?? "-"}</td>
-              <td>{run.result_summary?.slice(0, 100) ?? "-"}</td>
+              <td>{run.result_summary?.slice(0, 100) ?? "-"}{(run.result_summary?.length ?? 0) > 100 ? "..." : ""}</td>
               <td style={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
                 {new Date(run.started_at).toLocaleString()}
               </td>

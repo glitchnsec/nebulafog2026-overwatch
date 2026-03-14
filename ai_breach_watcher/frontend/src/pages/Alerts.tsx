@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getAlerts } from "../api";
 import { useFetch } from "../hooks";
 
 export default function Alerts() {
   const [severity, setSeverity] = useState("");
+  const navigate = useNavigate();
   const params = severity ? `severity=${severity}` : "";
   const { data, loading, error } = useFetch(() => getAlerts(params), [params]);
 
@@ -40,12 +42,16 @@ export default function Alerts() {
         </thead>
         <tbody>
           {(data ?? []).map((a) => (
-            <tr key={a.id}>
+            <tr
+              key={a.id}
+              className="clickable-row"
+              onClick={() => navigate(`/alerts/${a.id}`)}
+            >
               <td><span className={`badge ${a.severity}`}>{a.severity}</span></td>
-              <td>{a.summary}</td>
+              <td>{a.summary?.slice(0, 120)}{(a.summary?.length ?? 0) > 120 ? "..." : ""}</td>
               <td>{a.hosts?.join(", ")}</td>
               <td>{a.event_count}</td>
-              <td>{a.status}</td>
+              <td><span className={`badge ${a.status === "escalated" ? "high" : "low"}`}>{a.status}</span></td>
               <td style={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
                 {new Date(a.created_at).toLocaleString()}
               </td>

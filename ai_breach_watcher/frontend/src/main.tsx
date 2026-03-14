@@ -6,6 +6,8 @@ import Alerts from "./pages/Alerts";
 import Investigations from "./pages/Investigations";
 import Skills from "./pages/Skills";
 import AgentLogs from "./pages/AgentLogs";
+import AlertDetail from "./pages/AlertDetail";
+import AgentRunDetail from "./pages/AgentRunDetail";
 import "./index.css";
 
 function App() {
@@ -24,10 +26,12 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/alerts" element={<Alerts />} />
+            <Route path="/alerts/:id" element={<AlertDetail />} />
             <Route path="/investigations" element={<Investigations />} />
             <Route path="/skills" element={<Skills />} />
             <Route path="/skills/:name" element={<Skills />} />
             <Route path="/agents" element={<AgentLogs />} />
+            <Route path="/agents/:id" element={<AgentRunDetail />} />
           </Routes>
         </main>
       </div>

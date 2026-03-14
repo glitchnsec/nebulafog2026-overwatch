@@ -38,6 +38,24 @@ async def list_investigations(
         return []
 
 
+@router.get("/by-alert/{alert_id}")
+async def get_investigation_by_alert(request: Request, alert_id: str):
+    """Get investigation linked to a specific alert."""
+    es = request.app.state.es
+    try:
+        resp = await es.search(
+            index=settings.investigations_index,
+            query={"term": {"alert_id.keyword": alert_id}},
+            size=1,
+        )
+        hits = resp.get("hits", {}).get("hits", [])
+        if hits:
+            return hits[0]["_source"] | {"id": hits[0]["_id"]}
+    except Exception:
+        pass
+    return None
+
+
 @router.get("/{investigation_id}")
 async def get_investigation(request: Request, investigation_id: str):
     """Get a single investigation."""

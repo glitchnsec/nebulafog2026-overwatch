@@ -185,7 +185,8 @@ async def _run_agent_step(
             markdown=True,
         )
 
-        response = agent.run(prompt)
+        # Run in a thread to avoid blocking the async event loop
+        response = await asyncio.to_thread(agent.run, prompt)
         result = response.content if response and response.content else ""
         logger.info("Agent %s completed — %d chars output", agent_name, len(result))
 

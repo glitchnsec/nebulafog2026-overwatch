@@ -23,6 +23,8 @@ export const updateAlert = (id: string, body: Partial<Alert>) =>
 export const getInvestigations = () => fetchJson<Investigation[]>("/investigations");
 export const getInvestigation = (id: string) =>
   fetchJson<Investigation>(`/investigations/${id}`);
+export const getInvestigationByAlert = (alertId: string) =>
+  fetchJson<Investigation | null>(`/investigations/by-alert/${alertId}`);
 
 // Skills
 export const getSkills = () => fetchJson<SkillSummary[]>("/skills");
@@ -58,14 +60,23 @@ export interface Alert {
   hosts: string[];
   event_count: number;
   created_at: string;
+  triage_output?: string;
+  hunt_output?: string;
+  raw_event_ids?: string[];
 }
 
 export interface Investigation {
   id: string;
+  alert_id?: string;
   status: string;
+  severity?: string;
+  hosts?: string[];
   attack_narrative: string;
   kill_chain_phase: string;
   tactics: string[];
+  triage_output?: string;
+  ttp_analysis?: string;
+  response_plan?: string;
   created_at: string;
 }
 
@@ -96,4 +107,5 @@ export interface AgentRun {
   event_count?: number;
   result_summary?: string;
   reasoning_trace?: string;
+  prompt_preview?: string;
 }
