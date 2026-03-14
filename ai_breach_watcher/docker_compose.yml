@@ -1,0 +1,109 @@
+# =============================================================================
+# AI Breach Watcher — Blue Team Agent Platform
+# =============================================================================
+# Local dev:  docker compose --profile dev up --build
+# Production: docker compose --profile prod up --build
+#
+# In dev mode, a local Elasticsearch instance is included so you can
+# debug without the ELK host. In prod mode, the backend connects to
+# the existing ELK stack on localhost.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # DEV ONLY: Local Elasticsearch for debugging without ELK host
+  # ---------------------------------------------------------------------------
+  elasticsearch-dev:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    container_name: breach-watcher-es-dev
+    profiles: ["dev"]
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-dev-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'green\\|yellow'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # DEV ONLY: Seed fake log data into dev ES for testing
+  # ---------------------------------------------------------------------------
+  seed-dev-data:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: breach-watcher-seed
+    profiles: ["dev"]
+    command: ["python", "-m", "src.seed"]
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch-dev:9200
+    depends_on:
+      elasticsearch-dev:
+        condition: service_healthy
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # Backend: FastAPI + Agno agents + orchestrator
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: breach-watcher-backend
+    profiles: ["dev", "prod"]
+    ports:
+      - "8000:8000"
+    environment:
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-http://elasticsearch-dev:9200}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-60}
+      - HUNT_INTERVAL_SECONDS=${HUNT_INTERVAL_SECONDS:-300}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/.claude:/app/.claude
+      - skill-versions:/app/skill-versions
+    depends_on:
+      elasticsearch-dev:
+        condition: service_healthy
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Frontend: React UI for blue team operators
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: ${FRONTEND_TARGET:-dev}
+    container_name: breach-watcher-ui
+    profiles: ["dev", "prod"]
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000/ws}
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  es-dev-data:
+  skill-versions:
