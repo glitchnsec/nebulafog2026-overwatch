@@ -1,26 +1,22 @@
 #!/bin/bash
-# =============================================================================
-# CALDERA + Emu Plugin Setup — Runs via Terraform remote-exec
-# =============================================================================
+# Run on Attack Platform (10.0.2.4): sudo bash setup-caldera.sh
 
-echo "=== [1/6] Installing system dependencies ==="
+echo "=== [1/5] Installing dependencies ==="
 apt-get update -y
 apt-get install -y git python3 python3-pip python3-venv golang-go unzip jq curl
 
-echo "=== [2/6] Cloning CALDERA with all plugins ==="
+echo "=== [2/5] Cloning CALDERA ==="
 cd /home/ubuntu
-if [ ! -d "caldera" ]; then
-  git clone https://github.com/mitre/caldera.git --recursive --tag 5.1.0
-fi
+git clone https://github.com/mitre/caldera.git --recursive --tag 5.1.0
 cd caldera
 
-echo "=== [3/6] Setting up Python venv and installing deps ==="
+echo "=== [3/5] Python venv + deps ==="
 python3 -m venv .calderavenv
 source .calderavenv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
-echo "=== [4/6] Writing CALDERA config ==="
+echo "=== [4/5] Writing config ==="
 cat > conf/local.yml << 'EOF'
 host: 0.0.0.0
 port: 8888
@@ -36,47 +32,31 @@ users:
     blue: admin
 EOF
 
-echo "=== [5/6] Cloning adversary emulation library ==="
-cd /home/ubuntu
-if [ ! -d "adversary_emulation_library" ]; then
-  git clone https://github.com/center-for-threat-informed-defense/adversary_emulation_library.git
-fi
-cd adversary_emulation_library/wizard_spider
-python3 Resources/utilities/crypt_executables.py -i ./ -p malware --decrypt || echo "Payload decryption skipped or completed"
-
-echo "=== [6/6] Starting CALDERA ==="
-cd /home/ubuntu/caldera
-source .calderavenv/bin/activate
-
-# Start in background, log to file
+echo "=== [5/5] Starting CALDERA ==="
 nohup python3 server.py --insecure --build > /home/ubuntu/caldera.log 2>&1 &
-CALDERA_PID=$!
-echo "CALDERA started with PID $CALDERA_PID"
 
-# Wait for it to be ready
-echo "Waiting for CALDERA to start..."
+echo "Waiting for CALDERA..."
 for i in $(seq 1 60); do
-  if curl -s http://localhost:8888 > /dev/null 2>&1; then
-    echo "CALDERA is up and listening on :8888"
-    break
-  fi
-  echo "  ...waiting ($i/60)"
+  curl -s http://localhost:8888 > /dev/null 2>&1 && echo "CALDERA is up on :8888" && break
   sleep 5
 done
 
-# Download Emu payloads now that CALDERA has initialized the plugin dirs
+# Download Emu payloads
 if [ -f "plugins/emu/download_payloads.sh" ]; then
-  echo "Downloading Emu plugin payloads..."
-  cd plugins/emu
-  bash download_payloads.sh || echo "Some payloads may have failed — non-critical"
-  cd ../..
+  echo "Downloading Emu payloads..."
+  cd plugins/emu && bash download_payloads.sh && cd ../..
 fi
 
-# Fix ownership
+# Clone emulation library
+cd /home/ubuntu
+git clone https://github.com/center-for-threat-informed-defense/adversary_emulation_library.git
+cd adversary_emulation_library/wizard_spider
+python3 Resources/utilities/crypt_executables.py -i ./ -p malware --decrypt 2>/dev/null || true
+
 chown -R ubuntu:ubuntu /home/ubuntu/caldera /home/ubuntu/adversary_emulation_library
 
 echo ""
-echo "=== CALDERA deployment complete ==="
-echo "UI:   http://localhost:8888"
+echo "=== DONE ==="
+echo "UI:   http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8888"
 echo "Cred: red / admin"
-echo "Log:  /home/ubuntu/caldera.log"
+echo "Log:  tail -f /home/ubuntu/caldera.log"
