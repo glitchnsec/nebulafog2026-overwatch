@@ -35,15 +35,17 @@ async def list_alerts(
     if host:
         must_clauses.append({"term": {"hosts.keyword": host.upper()}})
 
-    resp = await es.search(
-        index=settings.alerts_index,
-        query={"bool": {"must": must_clauses}},
-        size=size,
-        sort=[{"created_at": {"order": "desc"}}],
-        ignore=[404],
-    )
-    hits = resp.get("hits", {}).get("hits", [])
-    return [h["_source"] | {"id": h["_id"]} for h in hits]
+    try:
+        resp = await es.search(
+            index=settings.alerts_index,
+            query={"bool": {"must": must_clauses}},
+            size=size,
+            sort=[{"created_at": {"order": "desc"}}],
+        )
+        hits = resp.get("hits", {}).get("hits", [])
+        return [h["_source"] | {"id": h["_id"]} for h in hits]
+    except Exception:
+        return []
 
 
 @router.get("/{alert_id}")

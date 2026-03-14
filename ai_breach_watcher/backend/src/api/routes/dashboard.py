@@ -7,13 +7,28 @@ from src.config import settings
 router = APIRouter()
 
 
+async def _safe_search(es, **kwargs) -> dict:
+    try:
+        return await es.search(**kwargs)
+    except Exception:
+        return {}
+
+
+async def _safe_count(es, **kwargs) -> int:
+    try:
+        resp = await es.count(**kwargs)
+        return resp.get("count", 0)
+    except Exception:
+        return 0
+
+
 @router.get("")
 async def get_dashboard(request: Request):
     """Return overview stats: alert counts by severity, agent run status."""
     es = request.app.state.es
 
-    # Alert counts by severity
-    alert_agg = await es.search(
+    alert_agg = await _safe_search(
+        es,
         index=settings.alerts_index,
         query={"match_all": {}},
         aggs={
@@ -21,7 +36,6 @@ async def get_dashboard(request: Request):
             "by_status": {"terms": {"field": "status.keyword", "size": 10}},
         },
         size=0,
-        ignore=[404],
     )
 
     severity_buckets = (
@@ -31,23 +45,21 @@ async def get_dashboard(request: Request):
         alert_agg.get("aggregations", {}).get("by_status", {}).get("buckets", [])
     )
 
-    # Open investigations count
-    inv_count = await es.count(
+    inv_count = await _safe_count(
+        es,
         index=settings.investigations_index,
         query={"term": {"status.keyword": "open"}},
-        ignore=[404],
     )
 
-    # Recent events count (last 5 min)
-    event_count = await es.count(
+    event_count = await _safe_count(
+        es,
         index=settings.winlogbeat_index,
         query={"range": {"@timestamp": {"gte": "now-5m"}}},
-        ignore=[404],
     )
 
     return {
         "alerts_by_severity": {b["key"]: b["doc_count"] for b in severity_buckets},
         "alerts_by_status": {b["key"]: b["doc_count"] for b in status_buckets},
-        "open_investigations": inv_count.get("count", 0),
-        "recent_events_5m": event_count.get("count", 0),
+        "open_investigations": inv_count,
+        "recent_events_5m": event_count,
     }

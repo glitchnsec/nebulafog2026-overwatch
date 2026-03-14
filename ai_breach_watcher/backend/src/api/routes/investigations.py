@@ -25,15 +25,17 @@ async def list_investigations(
     if status:
         query = {"term": {"status.keyword": status}}
 
-    resp = await es.search(
-        index=settings.investigations_index,
-        query=query,
-        size=size,
-        sort=[{"created_at": {"order": "desc"}}],
-        ignore=[404],
-    )
-    hits = resp.get("hits", {}).get("hits", [])
-    return [h["_source"] | {"id": h["_id"]} for h in hits]
+    try:
+        resp = await es.search(
+            index=settings.investigations_index,
+            query=query,
+            size=size,
+            sort=[{"created_at": {"order": "desc"}}],
+        )
+        hits = resp.get("hits", {}).get("hits", [])
+        return [h["_source"] | {"id": h["_id"]} for h in hits]
+    except Exception:
+        return []
 
 
 @router.get("/{investigation_id}")

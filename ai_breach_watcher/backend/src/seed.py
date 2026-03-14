@@ -209,6 +209,12 @@ async def seed():
         event.update(template)
         events.append(event)
 
+    # Set default template for single-node (0 replicas)
+    await es.indices.put_template(
+        name="single_node",
+        body={"index_patterns": ["*"], "settings": {"number_of_replicas": 0}},
+    )
+
     # Bulk index
     index_name = f"winlogbeat-{now.strftime('%Y.%m.%d')}"
     actions = []
@@ -216,13 +222,19 @@ async def seed():
         actions.append({"index": {"_index": index_name}})
         actions.append(event)
 
-    await es.bulk(operations=actions, refresh=True)
+    # Index in small batches to avoid timeouts
+    batch_size = 20
+    for i in range(0, len(actions), batch_size * 2):
+        batch = actions[i:i + batch_size * 2]
+        await es.bulk(operations=batch, request_timeout=60)
+    await es.indices.refresh(index=index_name)
     print(f"Seeded {len(events)} events into {index_name}")
 
     # Also create the watcher indices
+    single_node = {"settings": {"number_of_replicas": 0}}
     for idx in [settings.alerts_index, settings.investigations_index, settings.state_index]:
         if not await es.indices.exists(index=idx):
-            await es.indices.create(index=idx)
+            await es.indices.create(index=idx, body=single_node)
             print(f"Created index: {idx}")
 
     await es.close()

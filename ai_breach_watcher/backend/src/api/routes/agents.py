@@ -2,11 +2,8 @@
 
 from fastapi import APIRouter, Request, Query
 
-from src.config import settings
-
 router = APIRouter()
 
-# Agent run logs are stored in an ES index
 AGENT_LOGS_INDEX = "breach-watcher-agent-logs"
 
 
@@ -23,15 +20,54 @@ async def list_agent_runs(
     if agent_name:
         query = {"term": {"agent_name.keyword": agent_name}}
 
-    resp = await es.search(
-        index=AGENT_LOGS_INDEX,
-        query=query,
-        size=size,
-        sort=[{"started_at": {"order": "desc"}}],
-        ignore=[404],
-    )
-    hits = resp.get("hits", {}).get("hits", [])
-    return [h["_source"] | {"id": h["_id"]} for h in hits]
+    try:
+        resp = await es.search(
+            index=AGENT_LOGS_INDEX,
+            query=query,
+            size=size,
+            sort=[{"started_at": {"order": "desc"}}],
+        )
+        hits = resp.get("hits", {}).get("hits", [])
+        return [h["_source"] | {"id": h["_id"]} for h in hits]
+    except Exception:
+        return []
+
+
+@router.get("/status/current")
+async def agent_status(request: Request):
+    """Get current status of all agents (last run time, result)."""
+    es = request.app.state.es
+    try:
+        resp = await es.search(
+            index=AGENT_LOGS_INDEX,
+            query={"match_all": {}},
+            aggs={
+                "by_agent": {
+                    "terms": {"field": "agent_name.keyword", "size": 20},
+                    "aggs": {
+                        "latest": {
+                            "top_hits": {
+                                "size": 1,
+                                "sort": [{"started_at": {"order": "desc"}}],
+                            }
+                        }
+                    },
+                }
+            },
+            size=0,
+        )
+        buckets = resp.get("aggregations", {}).get("by_agent", {}).get("buckets", [])
+        return [
+            {
+                "agent_name": b["key"],
+                "last_run": b["latest"]["hits"]["hits"][0]["_source"]
+                if b["latest"]["hits"]["hits"]
+                else None,
+            }
+            for b in buckets
+        ]
+    except Exception:
+        return []
 
 
 @router.get("/{run_id}")
@@ -40,38 +76,3 @@ async def get_agent_run(request: Request, run_id: str):
     es = request.app.state.es
     resp = await es.get(index=AGENT_LOGS_INDEX, id=run_id)
     return resp["_source"] | {"id": resp["_id"]}
-
-
-@router.get("/status/current")
-async def agent_status(request: Request):
-    """Get current status of all agents (last run time, result)."""
-    es = request.app.state.es
-    resp = await es.search(
-        index=AGENT_LOGS_INDEX,
-        query={"match_all": {}},
-        aggs={
-            "by_agent": {
-                "terms": {"field": "agent_name.keyword", "size": 20},
-                "aggs": {
-                    "latest": {
-                        "top_hits": {
-                            "size": 1,
-                            "sort": [{"started_at": {"order": "desc"}}],
-                        }
-                    }
-                },
-            }
-        },
-        size=0,
-        ignore=[404],
-    )
-    buckets = resp.get("aggregations", {}).get("by_agent", {}).get("buckets", [])
-    return [
-        {
-            "agent_name": b["key"],
-            "last_run": b["latest"]["hits"]["hits"][0]["_source"]
-            if b["latest"]["hits"]["hits"]
-            else None,
-        }
-        for b in buckets
-    ]
