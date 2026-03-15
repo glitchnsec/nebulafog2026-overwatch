@@ -25,6 +25,9 @@ terraform.rc
 .env.*
 *.secret
 
+# ELK data exports
+elk-export/
+
 # OS files
 .DS_Store
 Thumbs.db
