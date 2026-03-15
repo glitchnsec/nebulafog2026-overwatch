@@ -1,7 +1,39 @@
 Uses terraform to deploy victim and attacker infrastructure and then some manually scripting!
 
+generate key pair
+
+```sh
+#aws ec2 delete-key-pair --key-name wizard-spider-lab
+
+
+aws ec2 create-key-pair \
+  --key-name wizard-spider-lab \
+  --key-type rsa \
+  --query "KeyMaterial" \
+  --output text > wizard-spider-lab.pem
+
+chmod 400 wizard-spider-lab.pem
 ```
 
+create infra
+
+```sh
+terraform apply \
+  -var="key_name=wizard-spider-lab" \
+  -var="my_ip=$(curl -s ifconfig.me)/32"
+```
+
+destroy infra
+
+```sh
+terraform destroy -auto-approve \
+  -var="key_name=wizard-spider-lab" \
+  -var="my_ip=$(curl -s ifconfig.me)/32"
+```
+
+Example output:
+
+```txt
 attack_platform = "3.96.198.17"
 dorothy = "99.79.48.57"
 elk = "15.223.1.249"
