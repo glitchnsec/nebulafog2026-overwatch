@@ -1,3 +1,8 @@
+![Dashboard](./img/Overwatch.png)
+![](./img/ActiveRansomware.png)
+![HunterBrief](./img/Hunter.png)
+![AgentLogs](./img/AgentLogs.png)
+
 # Create .env
 
 ```
@@ -48,3 +53,8 @@ done
 1. Use Claude Code subscriptions instead of API
 2. Implement Skills properly
 3. Work on baselining and bypassing AI during high confidence duplicate events or similar scenarios
+
+![NormalBehavior](./img/NormalBehavior.png)
+![](./img/Responder.png)
+![](./img/TTPAnalysisTeam.png)
+![](./img/Triage.png)
