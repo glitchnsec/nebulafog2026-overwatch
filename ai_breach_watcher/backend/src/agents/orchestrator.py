@@ -1,8 +1,15 @@
-"""Orchestrator — polls ES on an interval, feeds events into the breach workflow."""
+"""Orchestrator — polls ES on an interval, feeds events into the breach workflow.
+
+Flow:
+  1. Poll loop (fast) — baseline filter → triage classifier → only escalates
+     suspicious/needs_investigation batches (no alerts for normal activity)
+  2. Hunt loop (slow) — the ONLY agent that assigns severity and creates alerts.
+     Correlates events across broader time windows to find TTP chains.
+"""
 
 import asyncio
-import json
 import logging
+import re
 import traceback
 from datetime import datetime, timezone
 
@@ -24,7 +31,6 @@ async def run_poll_loop():
     es = AsyncElasticsearch(settings.elasticsearch_url)
     logger.info("Orchestrator started — polling every %ds", settings.poll_interval_seconds)
 
-    # Wait a few seconds for the app to fully start
     await asyncio.sleep(5)
 
     while True:
@@ -41,7 +47,7 @@ async def run_hunt_loop():
     es = AsyncElasticsearch(settings.elasticsearch_url)
     logger.info("Hunt loop started — running every %ds", settings.hunt_interval_seconds)
 
-    await asyncio.sleep(30)  # Let the system warm up
+    await asyncio.sleep(30)
 
     while True:
         try:
@@ -52,8 +58,12 @@ async def run_hunt_loop():
         await asyncio.sleep(settings.hunt_interval_seconds)
 
 
+# ---------------------------------------------------------------------------
+# Poll cycle — fast triage filter, no severity assignment
+# ---------------------------------------------------------------------------
+
 async def _poll_cycle(es: AsyncElasticsearch):
-    """Single poll cycle: fetch new events, filter baselines, run triage, broadcast results."""
+    """Single poll cycle: baseline filter → triage classifier → escalate if needed."""
     checkpoint = await get_checkpoint(es)
     last_poll = checkpoint.get("last_poll_timestamp", "now-5m")
 
@@ -68,7 +78,7 @@ async def _poll_cycle(es: AsyncElasticsearch):
     now = datetime.now(timezone.utc).isoformat()
     await update_checkpoint(es, last_poll_timestamp=now)
 
-    # --- Baseline filtering: suppress known-normal recurring events ---
+    # --- Baseline filtering ---
     novel_events, suppressed_events, suppression_stats = await check_baselines(es, events)
 
     if suppressed_events:
@@ -81,95 +91,120 @@ async def _poll_cycle(es: AsyncElasticsearch):
             "total": len(events),
             "patterns": len(suppression_stats),
         })
+        # Reinforce baseline for suppressed events
+        await update_baselines(es, suppressed_events, "normal")
 
     if not novel_events:
         logger.info("All %d events matched baselines — skipping triage", len(events))
-        # Still update baselines with the suppressed events
-        await update_baselines(es, suppressed_events, "low")
         return
 
     event_summary = _summarize_events(novel_events)
     hosts = list({e.get("host", {}).get("name", "unknown") for e in novel_events})
 
-    # Add suppression context to the triage prompt if some events were filtered
+    # Add baseline context to the triage prompt
     triage_context = ""
     if suppressed_events:
         triage_context = (
-            f"\n\nNote: {len(suppressed_events)} additional events were suppressed by "
+            f"Note: {len(suppressed_events)} additional events were suppressed by "
             f"baseline filtering (known-normal recurring patterns). The {len(novel_events)} "
             f"events below are novel or unusual.\n\n"
         )
 
-    # --- Step 1: Triage ---
+    # --- Triage: classify as normal / suspicious / needs_investigation ---
     triage_result = await _run_agent_step(
         es, "Triage", triage_context + event_summary, len(novel_events)
     )
 
-    # Parse severity from triage result
-    severity = _extract_severity(triage_result)
-    should_escalate = severity in ("critical", "high")
+    classification = _extract_classification(triage_result)
+    logger.info("Triage classified batch as: %s", classification)
 
-    # Update baselines with triage result
-    await update_baselines(es, novel_events, severity)
-    if suppressed_events:
-        await update_baselines(es, suppressed_events, "low")
+    if classification == "normal":
+        # Normal activity — update baselines, no alert, no escalation
+        await update_baselines(es, novel_events, "normal")
+        await broadcast("triage_normal", {
+            "event_count": len(novel_events),
+            "hosts": hosts,
+            "classification": "normal",
+        })
+        logger.info("Triage: normal — %d events baselined, no alert", len(novel_events))
+        return
 
-    # Store alert
-    alert = {
+    # --- Suspicious or needs_investigation: store for hunt agent to review ---
+    await update_baselines(es, novel_events, "suspicious")
+
+    # Store a triage record (not an alert — no severity yet)
+    triage_record = {
         "summary": triage_result[:500] if triage_result else f"Batch of {len(novel_events)} events",
         "event_count": len(novel_events),
         "suppressed_count": len(suppressed_events),
         "total_event_count": len(events),
         "hosts": hosts,
-        "severity": severity,
-        "status": "escalated" if should_escalate else "triaged",
+        "classification": classification,
+        "status": "pending_hunt",
         "triage_output": triage_result,
         "raw_event_ids": [e.get("_id", "") for e in novel_events[:20]],
     }
-    alert_id = await store_alert(alert)
-    await broadcast("new_alert", {
-        "id": alert_id, "severity": severity,
-        "summary": alert["summary"][:200], "hosts": hosts,
+    alert_id = await store_alert(triage_record)
+    await broadcast("triage_flagged", {
+        "id": alert_id,
+        "classification": classification,
+        "hosts": hosts,
         "event_count": len(novel_events),
-        "suppressed_count": len(suppressed_events),
+        "summary": triage_record["summary"][:200],
     })
-    logger.info("Alert %s created — severity: %s (suppressed %d baseline events)",
-                alert_id, severity, len(suppressed_events))
+    logger.info(
+        "Triage flagged %d events as %s — stored as %s for hunt review",
+        len(novel_events), classification, alert_id,
+    )
 
-    # --- Step 2: TTP Analysis (only for escalated alerts) ---
-    if should_escalate:
-        ttp_result = await _run_agent_step(
-            es, "TTP Analysis Team",
-            f"Triage found {severity} severity events. Analyze:\n\n{event_summary}",
-            len(novel_events),
-        )
+    # If needs_investigation, also trigger TTP team immediately
+    if classification == "needs_investigation":
+        await _escalate_to_ttp_team(es, alert_id, event_summary, triage_result, hosts)
 
-        # --- Step 3: Responder ---
-        responder_result = await _run_agent_step(
-            es, "Responder",
-            f"TTP Analysis:\n{ttp_result}\n\nOriginal events:\n{event_summary}",
-            len(novel_events),
-        )
 
-        # Store investigation
-        investigation = {
-            "alert_id": alert_id,
-            "hosts": hosts,
-            "severity": severity,
-            "triage_output": triage_result,
-            "ttp_analysis": ttp_result,
-            "response_plan": responder_result,
-            "attack_narrative": ttp_result[:500] if ttp_result else "",
-            "kill_chain_phase": _extract_phase(ttp_result),
-            "tactics": _extract_tactics(ttp_result),
-        }
-        inv_id = await store_investigation(investigation)
-        await broadcast("new_investigation", {"id": inv_id, "severity": severity, "hosts": hosts})
-        logger.info("Investigation %s created for alert %s", inv_id, alert_id)
+async def _escalate_to_ttp_team(
+    es: AsyncElasticsearch,
+    alert_id: str,
+    event_summary: str,
+    triage_result: str,
+    hosts: list[str],
+):
+    """Run TTP Analysis Team + Responder for urgent triage flags."""
+    ttp_result = await _run_agent_step(
+        es, "TTP Analysis Team",
+        f"Triage flagged these events as needing immediate investigation:\n\n"
+        f"Triage notes:\n{triage_result}\n\nRaw events:\n{event_summary}",
+        0,
+    )
 
+    responder_result = await _run_agent_step(
+        es, "Responder",
+        f"TTP Analysis:\n{ttp_result}\n\nOriginal events:\n{event_summary}",
+        0,
+    )
+
+    investigation = {
+        "alert_id": alert_id,
+        "hosts": hosts,
+        "status": "pending_hunt_severity",
+        "triage_output": triage_result,
+        "ttp_analysis": ttp_result,
+        "response_plan": responder_result,
+        "attack_narrative": ttp_result[:500] if ttp_result else "",
+        "kill_chain_phase": _extract_phase(ttp_result),
+        "tactics": _extract_tactics(ttp_result),
+    }
+    inv_id = await store_investigation(investigation)
+    await broadcast("new_investigation", {"id": inv_id, "hosts": hosts})
+    logger.info("Investigation %s created for alert %s (pending hunt severity)", inv_id, alert_id)
+
+
+# ---------------------------------------------------------------------------
+# Hunt cycle — the ONLY agent that assigns severity and creates real alerts
+# ---------------------------------------------------------------------------
 
 async def _hunt_cycle(es: AsyncElasticsearch):
-    """Run proactive hunting on a slower cadence."""
+    """Hunt cycle: correlate events across broader window, assign severity, tell threat stories."""
     checkpoint = await get_checkpoint(es)
     hunt_last = checkpoint.get("hunt_last_run", "now-30m")
 
@@ -184,26 +219,105 @@ async def _hunt_cycle(es: AsyncElasticsearch):
     await update_checkpoint(es, hunt_last_run=now)
 
     event_summary = _summarize_events(events)
+    hosts = list({e.get("host", {}).get("name", "unknown") for e in events})
+
+    # Also include any pending triage flags for context
+    pending_context = await _get_pending_triage_context(es)
+
+    hunt_prompt = (
+        f"Analyze these {len(events)} events from the last hunt window. "
+        f"Look for TTP chains and correlated adversary behavior across hosts and time.\n\n"
+    )
+    if pending_context:
+        hunt_prompt += (
+            f"The triage filter flagged the following as suspicious or needing "
+            f"investigation — factor these into your analysis:\n{pending_context}\n\n"
+        )
+    hunt_prompt += f"Events:\n{event_summary}"
 
     hunt_result = await _run_agent_step(
-        es, "Hunter",
-        f"Proactively hunt through these {len(events)} events for threats the triage pipeline might miss:\n\n{event_summary}",
-        len(events),
+        es, "Hunter", hunt_prompt, len(events),
     )
 
-    if hunt_result and "malicious" in hunt_result.lower():
-        alert = {
-            "summary": f"[HUNT] {hunt_result[:300]}",
-            "event_count": len(events),
-            "hosts": list({e.get("host", {}).get("name", "unknown") for e in events}),
-            "severity": "high",
-            "status": "hunt_finding",
-            "hunt_output": hunt_result,
-        }
-        alert_id = await store_alert(alert)
-        await broadcast("hunt_finding", {"id": alert_id, "summary": alert["summary"][:200]})
-        logger.info("Hunt finding stored as alert %s", alert_id)
+    # Hunt agent is the sole severity authority
+    severity = _extract_hunt_severity(hunt_result)
 
+    if severity == "none":
+        logger.info("Hunt: no actionable findings")
+        # Update any pending triage records to 'reviewed'
+        await _resolve_pending_triages(es)
+        return
+
+    # Create a real alert — the hunt agent found something
+    alert = {
+        "summary": _extract_hunt_summary(hunt_result),
+        "event_count": len(events),
+        "hosts": hosts,
+        "severity": severity,
+        "status": "hunt_finding",
+        "hunt_output": hunt_result,
+        "classification": "threat",
+    }
+    alert_id = await store_alert(alert)
+    await broadcast("hunt_finding", {
+        "id": alert_id,
+        "severity": severity,
+        "summary": alert["summary"][:200],
+        "hosts": hosts,
+    })
+    logger.info("Hunt finding: severity %s — alert %s", severity, alert_id)
+
+    # If high/critical, run TTP team + responder
+    if severity in ("critical", "high"):
+        await _escalate_to_ttp_team(es, alert_id, event_summary, hunt_result, hosts)
+
+    # Resolve pending triages — they've been reviewed
+    await _resolve_pending_triages(es)
+
+
+async def _get_pending_triage_context(es: AsyncElasticsearch) -> str:
+    """Fetch recent triage records that are pending hunt review."""
+    try:
+        resp = await es.search(
+            index=settings.alerts_index,
+            query={"term": {"status.keyword": "pending_hunt"}},
+            size=10,
+            sort=[{"created_at": {"order": "desc"}}],
+        )
+        hits = resp.get("hits", {}).get("hits", [])
+        if not hits:
+            return ""
+
+        lines = []
+        for h in hits:
+            src = h["_source"]
+            classification = src.get("classification", "suspicious")
+            summary = src.get("summary", "")[:200]
+            hosts = ", ".join(src.get("hosts", []))
+            lines.append(f"- [{classification}] {summary} (hosts: {hosts})")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+async def _resolve_pending_triages(es: AsyncElasticsearch):
+    """Mark pending triage records as reviewed by hunt agent."""
+    try:
+        await es.update_by_query(
+            index=settings.alerts_index,
+            query={"term": {"status.keyword": "pending_hunt"}},
+            script={
+                "source": "ctx._source.status = 'reviewed'",
+                "lang": "painless",
+            },
+        )
+    except Exception:
+        logger.debug("Failed to resolve pending triages")
+
+
+# ---------------------------------------------------------------------------
+# Agent runner
+# ---------------------------------------------------------------------------
 
 async def _run_agent_step(
     es: AsyncElasticsearch,
@@ -220,7 +334,6 @@ async def _run_agent_step(
     status = "completed"
 
     try:
-        # Create a lightweight agent for this step
         agent = Agent(
             name=agent_name,
             model=Claude(id="claude-sonnet-4-5"),
@@ -228,7 +341,6 @@ async def _run_agent_step(
             markdown=True,
         )
 
-        # Run in a thread to avoid blocking the async event loop
         response = await asyncio.to_thread(agent.run, prompt)
         result = response.content if response and response.content else ""
         logger.info("Agent %s completed — %d chars output", agent_name, len(result))
@@ -238,7 +350,6 @@ async def _run_agent_step(
         result = f"Error: {str(e)}\n{traceback.format_exc()}"
         logger.exception("Agent %s failed", agent_name)
 
-    # Log the run to ES
     try:
         log_entry = {
             "agent_name": agent_name,
@@ -258,6 +369,10 @@ async def _run_agent_step(
 
     return result
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _get_instructions(agent_name: str) -> str:
     """Load instructions from skill files."""
@@ -284,18 +399,64 @@ def _get_instructions(agent_name: str) -> str:
     return f"You are a {agent_name} security analyst. Analyze the provided events."
 
 
-def _extract_severity(triage_output: str) -> str:
-    """Extract the highest severity from triage output."""
+def _extract_classification(triage_output: str) -> str:
+    """Extract triage classification: normal, suspicious, or needs_investigation."""
     if not triage_output:
-        return "medium"
+        return "normal"
     output_lower = triage_output.lower()
-    if "critical" in output_lower:
-        return "critical"
-    if "high" in output_lower:
-        return "high"
-    if "medium" in output_lower:
-        return "medium"
-    return "low"
+
+    # Look for explicit classification markers
+    for marker in ("needs_investigation", "needs investigation"):
+        if marker in output_lower:
+            return "needs_investigation"
+    if "suspicious" in output_lower and "classification: suspicious" in output_lower:
+        return "suspicious"
+    # Check for classification header pattern
+    match = re.search(r"classification:\s*(normal|suspicious|needs_investigation|needs investigation)", output_lower)
+    if match:
+        val = match.group(1).replace(" ", "_")
+        return val
+
+    # Default to normal — do not assume the worst
+    return "normal"
+
+
+def _extract_hunt_severity(hunt_output: str) -> str:
+    """Extract severity from hunt agent output. Returns 'none' if no threat found."""
+    if not hunt_output:
+        return "none"
+    output_lower = hunt_output.lower()
+
+    # Look for explicit assessment markers from hunt output format
+    match = re.search(r"hunt assessment:\s*(critical|high|medium|low|none)", output_lower)
+    if match:
+        return match.group(1)
+
+    # Fallback: look for severity in structured output
+    match = re.search(r"severity[:\s]+(critical|high|medium|low|none)", output_lower)
+    if match:
+        return match.group(1)
+
+    # Default to none — do NOT assume threat
+    return "none"
+
+
+def _extract_hunt_summary(hunt_output: str) -> str:
+    """Extract a clean summary from hunt output for the alert."""
+    if not hunt_output:
+        return "Hunt finding"
+
+    # Try to find the Findings section
+    # Extract everything between "## Findings" and the next "##" heading
+    parts = re.split(r"\n##\s", hunt_output)
+    for part in parts:
+        if part.lstrip().startswith("Findings"):
+            # Strip the "Findings" header line
+            lines = part.split("\n", 1)
+            if len(lines) > 1:
+                return lines[1].strip()[:500]
+
+    return hunt_output[:500]
 
 
 def _extract_phase(ttp_output: str) -> str:
@@ -314,7 +475,6 @@ def _extract_phase(ttp_output: str) -> str:
 
 def _extract_tactics(ttp_output: str) -> list[str]:
     """Extract mentioned ATT&CK tactic IDs from TTP analysis."""
-    import re
     if not ttp_output:
         return []
     return list(set(re.findall(r"TA\d{4}", ttp_output)))
