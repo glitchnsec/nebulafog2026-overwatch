@@ -20,13 +20,12 @@ export default function AgentLogs() {
     <div>
       <h2 className="page-title">Agent Logs</h2>
 
-      <div style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem" }}>
+      <div className="agent-filter-bar">
         {AGENTS.map((a) => (
           <button
             key={a}
-            className={agent === a ? "primary" : ""}
+            className={`agent-filter-btn${agent === a ? " active" : ""}`}
             onClick={() => setAgent(a)}
-            style={agent !== a ? { background: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border)" } : {}}
           >
             {a || "All"}
           </button>
@@ -58,9 +57,7 @@ export default function AgentLogs() {
               </td>
               <td>{run.event_count ?? "-"}</td>
               <td>{run.result_summary?.slice(0, 100) ?? "-"}{(run.result_summary?.length ?? 0) > 100 ? "..." : ""}</td>
-              <td style={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
-                {new Date(run.started_at).toLocaleString()}
-              </td>
+              <td className="mono">{new Date(run.started_at).toLocaleString()}</td>
             </tr>
           ))}
           {(data ?? []).length === 0 && (

@@ -26,21 +26,12 @@ export default function AgentRunDetail() {
 
   return (
     <div>
-      <button
-        onClick={() => navigate("/agents")}
-        style={{
-          background: "none",
-          color: "var(--text-secondary)",
-          marginBottom: "1rem",
-          padding: "0.25rem 0",
-          fontSize: "0.85rem",
-        }}
-      >
+      <button className="back-btn" onClick={() => navigate("/agents")}>
         &larr; Back to Agent Logs
       </button>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
-        <h2 className="page-title" style={{ marginBottom: 0 }}>
+      <div className="agent-detail-header">
+        <h2 className="page-title">
           {run.agent_name}
         </h2>
         <span
@@ -56,20 +47,16 @@ export default function AgentRunDetail() {
         </span>
       </div>
 
-      <div className="card" style={{ marginBottom: "1.5rem" }}>
+      <div className="card card-spaced">
         <div className="detail-grid">
           <div>
             <span className="detail-label">Started</span>
-            <span className="detail-value" style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-              {new Date(run.started_at).toLocaleString()}
-            </span>
+            <span className="detail-value mono">{new Date(run.started_at).toLocaleString()}</span>
           </div>
           {run.completed_at && (
             <div>
               <span className="detail-label">Completed</span>
-              <span className="detail-value" style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                {new Date(run.completed_at).toLocaleString()}
-              </span>
+              <span className="detail-value mono">{new Date(run.completed_at).toLocaleString()}</span>
             </div>
           )}
           {duration !== null && (
@@ -86,7 +73,7 @@ export default function AgentRunDetail() {
       </div>
 
       {run.prompt_preview && (
-        <div className="card" style={{ marginBottom: "1.5rem" }}>
+        <div className="card card-spaced">
           <h3 className="section-title">Prompt (preview)</h3>
           <pre className="code-block">{run.prompt_preview}</pre>
         </div>

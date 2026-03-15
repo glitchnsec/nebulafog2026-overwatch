@@ -339,6 +339,64 @@ button.primary:hover { filter: brightness(1.15); }
   word-break: break-word;
 }
 
+/* Utility */
+.mono {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.8rem;
+}
+
+.card-spaced {
+  margin-bottom: 1.5rem;
+}
+
+/* Back button */
+.back-btn {
+  background: none;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+}
+
+/* Agent filter bar */
+.agent-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.agent-filter-btn {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.agent-filter-btn.active {
+  background: var(--accent-blue);
+  color: #fff;
+  border-color: var(--accent-blue);
+}
+
+/* Agent detail header */
+.agent-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.agent-detail-header .page-title {
+  margin-bottom: 0;
+}
+
 /* Agent flow pipeline */
 .agent-flow {
   display: flex;
@@ -1035,4 +1093,434 @@ a.demo-btn {
   color: var(--text-secondary);
   font-size: 0.82rem;
   border-top: 1px solid var(--border);
+}
+
+/* ==========================================================================
+   RESPONSIVE — Tablet (≤ 900px)
+   ========================================================================== */
+@media (max-width: 900px) {
+  /* Sidebar → horizontal top bar */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 0;
+    padding: 0;
+    overflow-x: auto;
+    z-index: 100;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar .logo {
+    padding: 0.75rem 1rem;
+    border-bottom: none;
+    margin-bottom: 0;
+    white-space: nowrap;
+    font-size: 1rem;
+  }
+
+  .sidebar a {
+    padding: 0.75rem 0.9rem;
+    white-space: nowrap;
+    font-size: 0.82rem;
+  }
+
+  .sidebar a.active {
+    border-right: none;
+    border-bottom: 2px solid var(--accent-blue);
+  }
+
+  .content {
+    margin-left: 0;
+    margin-top: 48px;
+    padding: 1.25rem;
+  }
+
+  /* Grids → single column on smaller tablets */
+  .about-grid-2,
+  .value-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Skill editor → stack */
+  .skill-editor {
+    grid-template-columns: 1fr;
+  }
+
+  /* Deploy steps → stack */
+  .deploy-steps {
+    flex-direction: column;
+  }
+
+  /* TTP grid → 2 columns */
+  .ttp-spread-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* About page padding */
+  .about-page {
+    padding: 0 1rem;
+  }
+
+  .hero {
+    padding: 2.5rem 0 1.5rem;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .about-heading-lg {
+    font-size: 1.4rem;
+  }
+
+  /* Stat bar → wrap */
+  .stat-bar {
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  .stat-divider {
+    display: none;
+  }
+
+  .stat-item {
+    min-width: 100px;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE — Mobile (≤ 600px)
+   ========================================================================== */
+@media (max-width: 600px) {
+  /* Sidebar top bar — hide labels, keep compact */
+  .sidebar .logo {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .sidebar a {
+    padding: 0.6rem 0.65rem;
+    font-size: 0.75rem;
+  }
+
+  .content {
+    padding: 1rem 0.75rem;
+    margin-top: 44px;
+  }
+
+  /* Page title */
+  .page-title {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Cards */
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+
+  .card {
+    padding: 0.9rem;
+  }
+
+  .card .value {
+    font-size: 1.4rem;
+  }
+
+  .card .label {
+    font-size: 0.7rem;
+  }
+
+  /* Tables → horizontal scroll */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  th, td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  /* Agent filter bar — scroll on small screens */
+  .agent-filter-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.4rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .agent-filter-btn {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.6rem;
+  }
+
+  /* Agent detail header */
+  .agent-detail-header {
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Detail grid */
+  .detail-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .detail-value.mono {
+    font-size: 0.72rem;
+    word-break: break-all;
+  }
+
+  /* Code block (prompt preview) */
+  .code-block {
+    font-size: 0.7rem;
+    padding: 0.75rem;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  /* Back button */
+  .back-btn {
+    font-size: 0.78rem;
+  }
+
+  /* Agent flow steps */
+  .flow-step-header {
+    padding: 0.6rem 0.75rem;
+    gap: 0.4rem;
+  }
+
+  .flow-step-name {
+    font-size: 0.82rem;
+  }
+
+  .flow-step-content {
+    padding: 0.75rem;
+    font-size: 0.82rem;
+    max-height: 350px;
+  }
+
+  /* Live feed */
+  .live-feed {
+    max-height: 200px;
+    padding: 0.75rem;
+  }
+
+  .feed-item {
+    font-size: 0.78rem;
+  }
+
+  /* Editor */
+  .editor-pane textarea {
+    min-height: 300px;
+    font-size: 0.78rem;
+    padding: 0.75rem;
+  }
+
+  /* About page hero */
+  .hero {
+    padding: 2rem 0 1.25rem;
+  }
+
+  .hero-title {
+    font-size: 1.6rem;
+    line-height: 1.2;
+  }
+
+  .hero-subtitle {
+    font-size: 0.92rem;
+  }
+
+  .hero-ctas {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .demo-btn {
+    width: 100%;
+    max-width: 280px;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Stat bar → 2x2 grid */
+  .stat-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .stat-number {
+    font-size: 1.4rem;
+  }
+
+  .stat-desc {
+    font-size: 0.7rem;
+    max-width: none;
+  }
+
+  /* About sections */
+  .about-section {
+    margin-bottom: 2.5rem;
+  }
+
+  .about-heading-lg {
+    font-size: 1.2rem;
+    line-height: 1.3;
+  }
+
+  .section-intro {
+    font-size: 0.85rem;
+  }
+
+  /* About grids */
+  .about-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  /* How it works */
+  .how-step {
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .how-number {
+    width: 30px;
+    height: 30px;
+    font-size: 0.85rem;
+  }
+
+  .how-connector {
+    margin-left: calc(1rem + 14px);
+    height: 14px;
+  }
+
+  /* Commitment card */
+  .commitment-card {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .commitment-card h2 {
+    font-size: 1.15rem;
+  }
+
+  .commitment-card p {
+    font-size: 0.85rem;
+  }
+
+  /* Use case / about cards */
+  .about-card,
+  .usecase-card,
+  .value-card {
+    padding: 1.15rem;
+  }
+
+  /* TTP grid → single column */
+  .ttp-spread-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Deploy steps */
+  .deploy-step {
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem;
+    gap: 0.6rem;
+  }
+
+  .deploy-num {
+    width: 24px;
+    height: 24px;
+    font-size: 0.72rem;
+  }
+
+  .deploy-note {
+    font-size: 0.78rem;
+  }
+
+  /* Final CTA */
+  .final-cta {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .final-cta h2 {
+    font-size: 1.2rem;
+  }
+
+  .final-cta p {
+    font-size: 0.85rem;
+  }
+
+  /* Version history */
+  .version-item {
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  /* Badges */
+  .badge {
+    font-size: 0.68rem;
+    padding: 0.15rem 0.45rem;
+  }
+
+  /* Markdown */
+  .markdown-body {
+    font-size: 0.82rem;
+  }
+
+  .markdown-body h1 { font-size: 1.1rem; }
+  .markdown-body h2 { font-size: 1rem; }
+  .markdown-body h3 { font-size: 0.92rem; }
+
+  .markdown-body pre {
+    padding: 0.75rem;
+  }
+
+  .markdown-body pre code {
+    font-size: 0.72rem;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE — Small phones (≤ 380px)
+   ========================================================================== */
+@media (max-width: 380px) {
+  .sidebar a {
+    padding: 0.5rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .hero-title {
+    font-size: 1.35rem;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ttp-spread-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
