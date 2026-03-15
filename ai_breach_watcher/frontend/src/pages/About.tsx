@@ -11,7 +11,7 @@ export default function About() {
           <span className="hero-accent">at the Speed of a Machine</span>
         </h1>
         <p className="hero-subtitle">
-          AI Breach Watcher monitors your environment around the clock, correlates
+          Overwatch monitors your environment around the clock, correlates
           adversary behavior across your kill chain, and surfaces only the threats
           that matter — so your team can focus on response, not triage.
         </p>
@@ -78,7 +78,7 @@ export default function About() {
 
       {/* ── Value props ── */}
       <div className="about-section">
-        <div className="section-label">Why Breach Watcher</div>
+        <div className="section-label">Why Overwatch</div>
         <h2 className="about-heading-lg">
           Threat stories, not log lines
         </h2>
@@ -91,7 +91,7 @@ export default function About() {
             </div>
             <h3>Correlated Attack Narratives</h3>
             <p>
-              Breach Watcher doesn't alert on isolated events. It correlates
+              Overwatch doesn't alert on isolated events. It correlates
               activity across hosts, time, and kill chain phases — then delivers
               a coherent threat narrative your team can act on immediately.
             </p>
@@ -104,7 +104,7 @@ export default function About() {
             </div>
             <h3>Severity Earned, Not Assumed</h3>
             <p>
-              Most tools over-alert to avoid missing anything. Breach Watcher
+              Most tools over-alert to avoid missing anything. Overwatch
               assumes benign by default. Severity is only assigned when correlated
               evidence across multiple kill chain phases justifies it.
             </p>
@@ -202,7 +202,7 @@ export default function About() {
         <div className="commitment-card">
           <h2>Recommends. Never executes.</h2>
           <p>
-            Breach Watcher drafts containment and remediation playbooks, but every
+            Overwatch drafts containment and remediation playbooks, but every
             action requires human approval. Your analysts make the final call —
             the AI provides the intelligence to make it fast.
           </p>
@@ -217,7 +217,7 @@ export default function About() {
           <div className="usecase-card">
             <h3>24/7 SOC Augmentation</h3>
             <p>
-              Extend your team's coverage without adding headcount. Breach Watcher
+              Extend your team's coverage without adding headcount. Overwatch
               monitors continuously and only pages when it has a real story to tell.
             </p>
           </div>
@@ -254,7 +254,7 @@ export default function About() {
           A coordinated team of AI specialists
         </h2>
         <p className="section-intro">
-          Breach Watcher deploys 10 purpose-built AI agents, each with a defined
+          Overwatch deploys 10 purpose-built AI agents, each with a defined
           role and strict authority boundaries. No single agent can both detect
           and assign severity — preventing the false-positive inflation that plagues
           conventional AI security tools.
@@ -356,7 +356,7 @@ export default function About() {
       </div>
 
       <div className="about-footer">
-        <p>AI Breach Watcher &mdash; NebularFog 2026</p>
+        <p>Overwatch &mdash; NebularFog 2026</p>
       </div>
     </div>
   );

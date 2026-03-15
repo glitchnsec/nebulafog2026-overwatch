@@ -15,7 +15,7 @@ function AppShell() {
   return (
     <div className="app">
       <nav className="sidebar">
-        <h1 className="logo">Breach Watcher</h1>
+        <h1 className="logo">Overwatch</h1>
         <NavLink to="/dashboard">Dashboard</NavLink>
         <NavLink to="/alerts">Alerts</NavLink>
         <NavLink to="/investigations">Investigations</NavLink>
