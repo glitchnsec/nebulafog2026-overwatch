@@ -50,8 +50,6 @@ services:
     profiles: ["dev", "prod"]
     environment:
       - ELASTICSEARCH_URL=http://elasticsearch-dev:9200
-    volumes:
-      - ../ai_emulation/elk-export.tar.gz:/data/elk-export.tar.gz:ro
     depends_on:
       elasticsearch-dev:
         condition: service_healthy
