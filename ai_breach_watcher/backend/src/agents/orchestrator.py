@@ -10,6 +10,7 @@ from elasticsearch import AsyncElasticsearch
 
 from src.config import settings
 from src.state.checkpoint import get_checkpoint, update_checkpoint
+from src.state.baselines import check_baselines, update_baselines
 from src.tools.elastic import search_events, store_alert, store_investigation
 from src.api.ws import broadcast
 
@@ -52,7 +53,7 @@ async def run_hunt_loop():
 
 
 async def _poll_cycle(es: AsyncElasticsearch):
-    """Single poll cycle: fetch new events, run triage, broadcast results."""
+    """Single poll cycle: fetch new events, filter baselines, run triage, broadcast results."""
     checkpoint = await get_checkpoint(es)
     last_poll = checkpoint.get("last_poll_timestamp", "now-5m")
 
@@ -67,45 +68,87 @@ async def _poll_cycle(es: AsyncElasticsearch):
     now = datetime.now(timezone.utc).isoformat()
     await update_checkpoint(es, last_poll_timestamp=now)
 
-    event_summary = _summarize_events(events)
-    hosts = list({e.get("host", {}).get("name", "unknown") for e in events})
+    # --- Baseline filtering: suppress known-normal recurring events ---
+    novel_events, suppressed_events, suppression_stats = await check_baselines(es, events)
+
+    if suppressed_events:
+        logger.info(
+            "Baseline suppressed %d/%d events (%d unique patterns)",
+            len(suppressed_events), len(events), len(suppression_stats),
+        )
+        await broadcast("baseline_suppressed", {
+            "suppressed": len(suppressed_events),
+            "total": len(events),
+            "patterns": len(suppression_stats),
+        })
+
+    if not novel_events:
+        logger.info("All %d events matched baselines — skipping triage", len(events))
+        # Still update baselines with the suppressed events
+        await update_baselines(es, suppressed_events, "low")
+        return
+
+    event_summary = _summarize_events(novel_events)
+    hosts = list({e.get("host", {}).get("name", "unknown") for e in novel_events})
+
+    # Add suppression context to the triage prompt if some events were filtered
+    triage_context = ""
+    if suppressed_events:
+        triage_context = (
+            f"\n\nNote: {len(suppressed_events)} additional events were suppressed by "
+            f"baseline filtering (known-normal recurring patterns). The {len(novel_events)} "
+            f"events below are novel or unusual.\n\n"
+        )
 
     # --- Step 1: Triage ---
     triage_result = await _run_agent_step(
-        es, "Triage", event_summary, len(events)
+        es, "Triage", triage_context + event_summary, len(novel_events)
     )
 
     # Parse severity from triage result
     severity = _extract_severity(triage_result)
     should_escalate = severity in ("critical", "high")
 
+    # Update baselines with triage result
+    await update_baselines(es, novel_events, severity)
+    if suppressed_events:
+        await update_baselines(es, suppressed_events, "low")
+
     # Store alert
     alert = {
-        "summary": triage_result[:500] if triage_result else f"Batch of {len(events)} events",
-        "event_count": len(events),
+        "summary": triage_result[:500] if triage_result else f"Batch of {len(novel_events)} events",
+        "event_count": len(novel_events),
+        "suppressed_count": len(suppressed_events),
+        "total_event_count": len(events),
         "hosts": hosts,
         "severity": severity,
         "status": "escalated" if should_escalate else "triaged",
         "triage_output": triage_result,
-        "raw_event_ids": [e.get("_id", "") for e in events[:20]],
+        "raw_event_ids": [e.get("_id", "") for e in novel_events[:20]],
     }
     alert_id = await store_alert(alert)
-    await broadcast("new_alert", {"id": alert_id, "severity": severity, "summary": alert["summary"][:200], "hosts": hosts, "event_count": len(events)})
-    logger.info("Alert %s created — severity: %s", alert_id, severity)
+    await broadcast("new_alert", {
+        "id": alert_id, "severity": severity,
+        "summary": alert["summary"][:200], "hosts": hosts,
+        "event_count": len(novel_events),
+        "suppressed_count": len(suppressed_events),
+    })
+    logger.info("Alert %s created — severity: %s (suppressed %d baseline events)",
+                alert_id, severity, len(suppressed_events))
 
     # --- Step 2: TTP Analysis (only for escalated alerts) ---
     if should_escalate:
         ttp_result = await _run_agent_step(
             es, "TTP Analysis Team",
             f"Triage found {severity} severity events. Analyze:\n\n{event_summary}",
-            len(events),
+            len(novel_events),
         )
 
         # --- Step 3: Responder ---
         responder_result = await _run_agent_step(
             es, "Responder",
             f"TTP Analysis:\n{ttp_result}\n\nOriginal events:\n{event_summary}",
-            len(events),
+            len(novel_events),
         )
 
         # Store investigation
