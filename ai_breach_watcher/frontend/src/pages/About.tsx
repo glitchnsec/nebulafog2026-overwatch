@@ -19,9 +19,9 @@ export default function About() {
           <button className="demo-btn" onClick={() => navigate("/dashboard")}>
             Open Demo Dashboard
           </button>
-          <button className="demo-btn secondary" onClick={() => navigate("/alerts")}>
-            View Alerts
-          </button>
+          <a className="demo-btn secondary" href="https://github.com/glitchnsec/nebulafog2026-overwatch" target="_blank" rel="noopener noreferrer">
+            GitHub
+          </a>
         </div>
       </div>
 

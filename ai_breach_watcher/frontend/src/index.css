@@ -617,6 +617,12 @@ button.primary:hover { filter: brightness(1.15); }
   color: var(--text-primary);
 }
 
+a.demo-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
 .demo-btn.secondary:hover {
   border-color: var(--accent-blue);
   color: var(--accent-blue);
