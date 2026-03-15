@@ -285,6 +285,11 @@ button.primary:hover { filter: brightness(1.15); }
   background: var(--bg-secondary) !important;
 }
 
+.empty-row {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
 /* Detail page */
 .detail-grid {
   display: grid;
@@ -1240,17 +1245,80 @@ a.demo-btn {
     font-size: 0.7rem;
   }
 
-  /* Tables → horizontal scroll */
-  table {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  /* Tables → stacked cards on mobile */
+  .responsive-table thead {
+    display: none;
   }
 
-  th, td {
+  .responsive-table,
+  .responsive-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .responsive-table tr {
+    display: block;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .responsive-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.3rem 0;
+    font-size: 0.82rem;
+    white-space: normal;
+    border: none;
+    gap: 0.75rem;
+  }
+
+  .responsive-table td::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+    min-width: 70px;
+    flex-shrink: 0;
+    padding-top: 0.1rem;
+  }
+
+  .responsive-table td:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.4rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .responsive-table .empty-row {
+    text-align: center;
+    color: var(--text-secondary);
+  }
+
+  .responsive-table .empty-row::before {
+    display: none;
+  }
+
+  /* Non-responsive tables still scroll */
+  table:not(.responsive-table) {
+    display: block;
+    overflow-x: auto;
+  }
+
+  table:not(.responsive-table) th,
+  table:not(.responsive-table) td {
     padding: 0.5rem 0.75rem;
     font-size: 0.8rem;
     white-space: nowrap;
+  }
+
+  .empty-row {
+    text-align: center;
+    color: var(--text-secondary);
   }
 
   /* Agent filter bar — scroll on small screens */

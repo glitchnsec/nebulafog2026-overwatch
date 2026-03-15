@@ -16,20 +16,19 @@ export default function Alerts() {
     <div>
       <h2 className="page-title">Alerts</h2>
 
-      <div style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem" }}>
+      <div className="agent-filter-bar">
         {["", "critical", "high", "medium", "low"].map((s) => (
           <button
             key={s}
-            className={severity === s ? "primary" : ""}
+            className={`agent-filter-btn${severity === s ? " active" : ""}`}
             onClick={() => setSeverity(s)}
-            style={severity !== s ? { background: "var(--bg-card)", color: "var(--text-secondary)", border: "1px solid var(--border)" } : {}}
           >
             {s || "All"}
           </button>
         ))}
       </div>
 
-      <table>
+      <table className="responsive-table">
         <thead>
           <tr>
             <th>Severity</th>
@@ -47,18 +46,16 @@ export default function Alerts() {
               className="clickable-row"
               onClick={() => navigate(`/alerts/${a.id}`)}
             >
-              <td><span className={`badge ${a.severity}`}>{a.severity}</span></td>
-              <td>{a.summary?.slice(0, 120)}{(a.summary?.length ?? 0) > 120 ? "..." : ""}</td>
-              <td>{a.hosts?.join(", ")}</td>
-              <td>{a.event_count}</td>
-              <td><span className={`badge ${a.status === "escalated" ? "high" : "low"}`}>{a.status}</span></td>
-              <td style={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
-                {new Date(a.created_at).toLocaleString()}
-              </td>
+              <td data-label="Severity"><span className={`badge ${a.severity}`}>{a.severity}</span></td>
+              <td data-label="Summary">{a.summary?.slice(0, 120)}{(a.summary?.length ?? 0) > 120 ? "..." : ""}</td>
+              <td data-label="Hosts">{a.hosts?.join(", ")}</td>
+              <td data-label="Events">{a.event_count}</td>
+              <td data-label="Status"><span className={`badge ${a.status === "escalated" ? "high" : "low"}`}>{a.status}</span></td>
+              <td data-label="Time" className="mono">{new Date(a.created_at).toLocaleString()}</td>
             </tr>
           ))}
           {(data ?? []).length === 0 && (
-            <tr><td colSpan={6} style={{ textAlign: "center", color: "var(--text-secondary)" }}>No alerts</td></tr>
+            <tr><td colSpan={6} className="empty-row">No alerts</td></tr>
           )}
         </tbody>
       </table>

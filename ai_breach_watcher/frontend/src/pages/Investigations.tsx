@@ -11,7 +11,7 @@ export default function Investigations() {
     <div>
       <h2 className="page-title">Investigations</h2>
 
-      <table>
+      <table className="responsive-table">
         <thead>
           <tr>
             <th>Status</th>
@@ -24,17 +24,15 @@ export default function Investigations() {
         <tbody>
           {(data ?? []).map((inv) => (
             <tr key={inv.id}>
-              <td><span className={`badge ${inv.status === "open" ? "high" : "low"}`}>{inv.status}</span></td>
-              <td>{inv.kill_chain_phase}</td>
-              <td>{inv.tactics?.join(", ")}</td>
-              <td>{inv.attack_narrative?.slice(0, 120)}</td>
-              <td style={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
-                {new Date(inv.created_at).toLocaleString()}
-              </td>
+              <td data-label="Status"><span className={`badge ${inv.status === "open" ? "high" : "low"}`}>{inv.status}</span></td>
+              <td data-label="Kill Chain">{inv.kill_chain_phase}</td>
+              <td data-label="Tactics">{inv.tactics?.join(", ")}</td>
+              <td data-label="Narrative">{inv.attack_narrative?.slice(0, 120)}</td>
+              <td data-label="Created" className="mono">{new Date(inv.created_at).toLocaleString()}</td>
             </tr>
           ))}
           {(data ?? []).length === 0 && (
-            <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-secondary)" }}>No investigations</td></tr>
+            <tr><td colSpan={5} className="empty-row">No investigations</td></tr>
           )}
         </tbody>
       </table>

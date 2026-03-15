@@ -32,7 +32,7 @@ export default function AgentLogs() {
         ))}
       </div>
 
-      <table>
+      <table className="responsive-table">
         <thead>
           <tr>
             <th>Agent</th>
@@ -49,19 +49,19 @@ export default function AgentLogs() {
               className="clickable-row"
               onClick={() => navigate(`/agents/${run.id}`)}
             >
-              <td>{run.agent_name}</td>
-              <td>
+              <td data-label="Agent">{run.agent_name}</td>
+              <td data-label="Status">
                 <span className={`badge ${run.status === "completed" ? "low" : run.status === "running" ? "medium" : "high"}`}>
                   {run.status}
                 </span>
               </td>
-              <td>{run.event_count ?? "-"}</td>
-              <td>{run.result_summary?.slice(0, 100) ?? "-"}{(run.result_summary?.length ?? 0) > 100 ? "..." : ""}</td>
-              <td className="mono">{new Date(run.started_at).toLocaleString()}</td>
+              <td data-label="Events">{run.event_count ?? "-"}</td>
+              <td data-label="Summary">{run.result_summary?.slice(0, 100) ?? "-"}{(run.result_summary?.length ?? 0) > 100 ? "..." : ""}</td>
+              <td data-label="Started" className="mono">{new Date(run.started_at).toLocaleString()}</td>
             </tr>
           ))}
           {(data ?? []).length === 0 && (
-            <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-secondary)" }}>No agent runs</td></tr>
+            <tr><td colSpan={5} className="empty-row">No agent runs</td></tr>
           )}
         </tbody>
       </table>
