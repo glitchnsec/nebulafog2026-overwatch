@@ -17,7 +17,7 @@ services:
   elasticsearch-dev:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: breach-watcher-es-dev
-    profiles: ["dev", "seeded_dev"]
+    profiles: ["dev", "seeded_dev", "prod"]
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -29,7 +29,11 @@ services:
     volumes:
       - es-dev-data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'green\\|yellow'"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s http://localhost:9200/_cluster/health | grep -q 'green\\|yellow'",
+        ]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -43,7 +47,7 @@ services:
       context: ./elk-loader
       dockerfile: Dockerfile
     container_name: breach-watcher-elk-loader
-    profiles: ["dev"]
+    profiles: ["dev", "prod"]
     environment:
       - ELASTICSEARCH_URL=http://elasticsearch-dev:9200
     volumes:
@@ -71,14 +75,14 @@ services:
     restart: "no"
 
   # ---------------------------------------------------------------------------
-  # Backend: FastAPI + Agno agents + orchestrator
+  # DEV / SEEDED_DEV: Backend with hot-reload volume mounts
   # ---------------------------------------------------------------------------
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: breach-watcher-backend
-    profiles: ["dev", "seeded_dev", "prod"]
+    profiles: ["dev", "seeded_dev"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
@@ -103,7 +107,7 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # Frontend: React UI for blue team operators
+  # DEV / SEEDED_DEV: Frontend with hot-reload volume mounts
   # ---------------------------------------------------------------------------
   frontend:
     build:
@@ -111,7 +115,7 @@ services:
       dockerfile: Dockerfile
       target: ${FRONTEND_TARGET:-dev}
     container_name: breach-watcher-ui
-    profiles: ["dev", "seeded_dev", "prod"]
+    profiles: ["dev", "seeded_dev"]
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
@@ -121,6 +125,52 @@ services:
       - ./frontend/src:/app/src
     depends_on:
       backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # PROD: Backend — no volume mounts, code baked into image
+  # ---------------------------------------------------------------------------
+  backend-prod:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: breach-watcher-backend
+    profiles: ["prod"]
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL:-http://elasticsearch-dev:9200}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - POLL_INTERVAL_SECONDS=${POLL_INTERVAL_SECONDS:-60}
+      - HUNT_INTERVAL_SECONDS=${HUNT_INTERVAL_SECONDS:-300}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - skill-versions:/app/skill-versions
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # PROD: Frontend — no volume mounts, code baked into image
+  # ---------------------------------------------------------------------------
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: ${FRONTEND_TARGET:-dev}
+    container_name: breach-watcher-ui
+    profiles: ["prod"]
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://backend-prod:8000}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://backend-prod:8000/ws}
+    depends_on:
+      backend-prod:
         condition: service_healthy
     restart: unless-stopped
 
