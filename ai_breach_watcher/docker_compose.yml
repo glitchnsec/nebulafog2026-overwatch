@@ -1,22 +1,23 @@
 # =============================================================================
 # AI Breach Watcher — Blue Team Agent Platform
 # =============================================================================
-# Local dev:  docker compose --profile dev up --build
-# Production: docker compose --profile prod up --build
+# Local dev (real data):   docker compose --profile dev up --build
+# Local dev (fake seed):   docker compose --profile seeded_dev up --build
+# Production:              docker compose --profile prod up --build
 #
-# In dev mode, a local Elasticsearch instance is included so you can
-# debug without the ELK host. In prod mode, the backend connects to
-# the existing ELK stack on localhost.
+# - dev:        Local ES + real ELK export loaded + backend + frontend
+# - seeded_dev: Local ES + fake seed data + backend + frontend
+# - prod:       Backend + frontend only (connects to existing ELK stack)
 # =============================================================================
 
 services:
   # ---------------------------------------------------------------------------
-  # DEV ONLY: Local Elasticsearch for debugging without ELK host
+  # DEV / SEEDED_DEV: Local Elasticsearch for debugging without ELK host
   # ---------------------------------------------------------------------------
   elasticsearch-dev:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     container_name: breach-watcher-es-dev
-    profiles: ["dev"]
+    profiles: ["dev", "seeded_dev"]
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -35,14 +36,32 @@ services:
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
-  # DEV ONLY: Seed fake log data into dev ES for testing
+  # DEV ONLY: Load real ELK export into dev ES
+  # ---------------------------------------------------------------------------
+  load-elk-export:
+    build:
+      context: ./elk-loader
+      dockerfile: Dockerfile
+    container_name: breach-watcher-elk-loader
+    profiles: ["dev"]
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch-dev:9200
+    volumes:
+      - ../ai_emulation/elk-export.tar.gz:/data/elk-export.tar.gz:ro
+    depends_on:
+      elasticsearch-dev:
+        condition: service_healthy
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # SEEDED_DEV ONLY: Seed fake log data into dev ES for testing
   # ---------------------------------------------------------------------------
   seed-dev-data:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: breach-watcher-seed
-    profiles: ["dev"]
+    profiles: ["seeded_dev"]
     command: ["python", "-m", "src.seed"]
     environment:
       - ELASTICSEARCH_URL=http://elasticsearch-dev:9200
@@ -59,7 +78,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: breach-watcher-backend
-    profiles: ["dev", "prod"]
+    profiles: ["dev", "seeded_dev", "prod"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
@@ -92,7 +111,7 @@ services:
       dockerfile: Dockerfile
       target: ${FRONTEND_TARGET:-dev}
     container_name: breach-watcher-ui
-    profiles: ["dev", "prod"]
+    profiles: ["dev", "seeded_dev", "prod"]
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
