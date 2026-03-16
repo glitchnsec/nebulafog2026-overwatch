@@ -389,6 +389,57 @@ button.primary:hover { filter: brightness(1.15); }
   border-color: var(--accent-blue);
 }
 
+/* Alerts toolbar */
+.alerts-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.alerts-toolbar .agent-filter-bar {
+  margin-bottom: 0;
+}
+
+/* Time range filter */
+.time-filter-bar {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.15rem;
+}
+
+.time-filter-btn {
+  background: none;
+  color: var(--text-secondary);
+  border: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.time-filter-btn.active {
+  background: var(--accent-blue);
+  color: #fff;
+}
+
+.time-filter-btn:hover:not(.active) {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+/* Section heading (dashboard subsections) */
+.section-heading {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 /* Agent detail header */
 .agent-detail-header {
   display: flex;
@@ -1319,6 +1370,18 @@ a.demo-btn {
   .empty-row {
     text-align: center;
     color: var(--text-secondary);
+  }
+
+  /* Alerts toolbar — stack on mobile */
+  .alerts-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .time-filter-btn {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.5rem;
   }
 
   /* Agent filter bar — scroll on small screens */

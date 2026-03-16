@@ -1,5 +1,6 @@
 import { getDashboard } from "../api";
 import { useFetch, useLiveFeed } from "../hooks";
+import AlertsTable from "../components/AlertsTable";
 
 export default function Dashboard() {
   const { data, loading, error } = useFetch(getDashboard);
@@ -38,7 +39,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <h3 style={{ marginBottom: "0.75rem" }}>Live Feed</h3>
+      <h3 className="section-heading">Live Feed</h3>
       <div className="live-feed">
         {feed.length === 0 && (
           <div className="feed-item" style={{ color: "var(--text-secondary)" }}>
@@ -57,6 +58,9 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      <h3 className="section-heading">Recent Alerts</h3>
+      <AlertsTable defaultTimeFrom="now-10y" />
     </div>
   );
 }
