@@ -4,7 +4,7 @@ export default function Alerts() {
   return (
     <div>
       <h2 className="page-title">Alerts</h2>
-      <AlertsTable />
+      <AlertsTable defaultTimeFrom="now-10y" />
     </div>
   );
 }
